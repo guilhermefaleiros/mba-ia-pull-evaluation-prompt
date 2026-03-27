@@ -23,6 +23,8 @@ from typing import List, Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
 from langsmith import Client
+from langsmith.evaluation import evaluate as langsmith_evaluate
+from langsmith.evaluation.evaluator import EvaluationResult, run_evaluator
 from langchain_core.prompts import ChatPromptTemplate
 from utils import (
     check_env_vars,
@@ -117,37 +119,73 @@ def pull_prompt_from_langsmith(prompt_name: str) -> ChatPromptTemplate:
 
 def evaluate_prompt_on_example(
     prompt_template: ChatPromptTemplate,
-    example: Any,
     llm: Any
-) -> Dict[str, Any]:
-    try:
-        inputs = example.inputs if hasattr(example, 'inputs') else {}
-        outputs = example.outputs if hasattr(example, 'outputs') else {}
+) -> Any:
+    chain = prompt_template | llm
 
-        chain = prompt_template | llm
-
+    def predict(inputs: Dict[str, Any]) -> Dict[str, Any]:
         response = chain.invoke(inputs)
-        answer = response.content
+        answer = response.content if hasattr(response, "content") else str(response)
+        return {"answer": answer}
 
-        reference = outputs.get("reference", "") if isinstance(outputs, dict) else ""
+    return predict
 
-        bug_report = inputs.get("bug_report", "") if isinstance(inputs, dict) else ""
 
-        return {
-            "answer": answer,
-            "reference": reference,
-            "bug_report": bug_report
-        }
+def build_evaluators():
+    @run_evaluator
+    def tone_evaluator(run, example):
+        bug_report = (example.inputs or {}).get("bug_report", "") if example else ""
+        reference = (example.outputs or {}).get("reference", "") if example else ""
+        answer = (run.outputs or {}).get("answer", "")
+        result = evaluate_tone_score(bug_report, answer, reference)
+        return EvaluationResult(
+            key="tone",
+            score=result["score"],
+            comment=result.get("reasoning", "")
+        )
 
-    except Exception as e:
-        print(f"      ⚠️  Erro ao avaliar exemplo: {e}")
-        import traceback
-        print(f"      Traceback: {traceback.format_exc()}")
-        return {
-            "answer": "",
-            "reference": "",
-            "bug_report": ""
-        }
+    @run_evaluator
+    def acceptance_evaluator(run, example):
+        bug_report = (example.inputs or {}).get("bug_report", "") if example else ""
+        reference = (example.outputs or {}).get("reference", "") if example else ""
+        answer = (run.outputs or {}).get("answer", "")
+        result = evaluate_acceptance_criteria_score(bug_report, answer, reference)
+        return EvaluationResult(
+            key="acceptance_criteria",
+            score=result["score"],
+            comment=result.get("reasoning", "")
+        )
+
+    @run_evaluator
+    def format_evaluator(run, example):
+        bug_report = (example.inputs or {}).get("bug_report", "") if example else ""
+        reference = (example.outputs or {}).get("reference", "") if example else ""
+        answer = (run.outputs or {}).get("answer", "")
+        result = evaluate_user_story_format_score(bug_report, answer, reference)
+        return EvaluationResult(
+            key="user_story_format",
+            score=result["score"],
+            comment=result.get("reasoning", "")
+        )
+
+    @run_evaluator
+    def completeness_evaluator(run, example):
+        bug_report = (example.inputs or {}).get("bug_report", "") if example else ""
+        reference = (example.outputs or {}).get("reference", "") if example else ""
+        answer = (run.outputs or {}).get("answer", "")
+        result = evaluate_completeness_score(bug_report, answer, reference)
+        return EvaluationResult(
+            key="completeness",
+            score=result["score"],
+            comment=result.get("reasoning", "")
+        )
+
+    return [
+        tone_evaluator,
+        acceptance_evaluator,
+        format_evaluator,
+        completeness_evaluator,
+    ]
 
 
 def evaluate_prompt(
@@ -159,40 +197,64 @@ def evaluate_prompt(
 
     try:
         prompt_template = pull_prompt_from_langsmith(prompt_name)
+        llm = get_llm()
+        predict = evaluate_prompt_on_example(prompt_template, llm)
+        evaluators = build_evaluators()
 
         examples = list(client.list_examples(dataset_name=dataset_name))
         print(f"   Dataset: {len(examples)} exemplos")
 
-        llm = get_llm()
+        print("   Avaliando exemplos...")
+
+        experiment_results = langsmith_evaluate(
+            predict,
+            data=dataset_name,
+            evaluators=evaluators,
+            experiment_prefix=f"{prompt_name.split('/')[-1]}-eval",
+            description=f"Avaliação automática do prompt {prompt_name}",
+            metadata={
+                "prompt_name": prompt_name,
+                "llm_provider": os.getenv("LLM_PROVIDER", "openai"),
+                "llm_model": os.getenv("LLM_MODEL", ""),
+                "eval_model": os.getenv("EVAL_MODEL", ""),
+            },
+            client=client,
+            max_concurrency=1,
+            blocking=True,
+            upload_results=True,
+        )
 
         tone_scores = []
         acceptance_scores = []
         format_scores = []
         completeness_scores = []
 
-        print("   Avaliando exemplos...")
+        rows = list(experiment_results)
+        print(f"   Experimento LangSmith: {experiment_results.experiment_name}")
+        print(f"   URL: {experiment_results.url}")
 
-        for i, example in enumerate(examples[:10], 1):
-            result = evaluate_prompt_on_example(prompt_template, example, llm)
+        for i, row in enumerate(rows[:10], 1):
+            feedback_map = {
+                result.key: result.score
+                for result in row["evaluation_results"]["results"]
+            }
+            tone_score = float(feedback_map.get("tone", 0.0) or 0.0)
+            acceptance_score = float(feedback_map.get("acceptance_criteria", 0.0) or 0.0)
+            format_score = float(feedback_map.get("user_story_format", 0.0) or 0.0)
+            completeness_score = float(feedback_map.get("completeness", 0.0) or 0.0)
 
-            if result["answer"]:
-                tone = evaluate_tone_score(result["bug_report"], result["answer"], result["reference"])
-                acceptance = evaluate_acceptance_criteria_score(result["bug_report"], result["answer"], result["reference"])
-                story_format = evaluate_user_story_format_score(result["bug_report"], result["answer"], result["reference"])
-                completeness = evaluate_completeness_score(result["bug_report"], result["answer"], result["reference"])
+            tone_scores.append(tone_score)
+            acceptance_scores.append(acceptance_score)
+            format_scores.append(format_score)
+            completeness_scores.append(completeness_score)
 
-                tone_scores.append(tone["score"])
-                acceptance_scores.append(acceptance["score"])
-                format_scores.append(story_format["score"])
-                completeness_scores.append(completeness["score"])
-
-                print(
-                    f"      [{i}/{min(10, len(examples))}] "
-                    f"Tone:{tone['score']:.2f} "
-                    f"Criteria:{acceptance['score']:.2f} "
-                    f"Format:{story_format['score']:.2f} "
-                    f"Complete:{completeness['score']:.2f}"
-                )
+            print(
+                f"      [{i}/{min(10, len(rows))}] "
+                f"Tone:{tone_score:.2f} "
+                f"Criteria:{acceptance_score:.2f} "
+                f"Format:{format_score:.2f} "
+                f"Complete:{completeness_score:.2f}"
+            )
 
         avg_tone = sum(tone_scores) / len(tone_scores) if tone_scores else 0.0
         avg_acceptance = sum(acceptance_scores) / len(acceptance_scores) if acceptance_scores else 0.0

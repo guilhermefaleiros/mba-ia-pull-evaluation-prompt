@@ -60,6 +60,7 @@ O refinamento foi iterativo, guiado pelas métricas das avaliações:
 ### Prompt publicado
 
 - `guilhermefaleiros/bug_to_user_story_v2`
+- [Prompt publicado no LangSmith Hub](https://smith.langchain.com/hub/guilhermefaleiros/bug_to_user_story_v2)
 
 ### Métricas finais obtidas
 
@@ -76,6 +77,10 @@ O refinamento foi iterativo, guiado pelas métricas das avaliações:
 - Todas as 4 métricas ficaram `>= 0.9`
 - A média geral ficou `>= 0.9`
 - O prompt foi **aprovado**
+
+### Dashboard público do experimento
+
+- [Dashboard público no LangSmith](https://smith.langchain.com/public/181f64ea-0473-4bba-9948-c208e35618fc/d)
 
 ### Tabela comparativa
 
