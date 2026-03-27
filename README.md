@@ -7,7 +7,7 @@ Você deve entregar um software capaz de:
 1. **Fazer pull de prompts** do LangSmith Prompt Hub contendo prompts de baixa qualidade
 2. **Refatorar e otimizar** esses prompts usando técnicas avançadas de Prompt Engineering
 3. **Fazer push dos prompts otimizados** de volta ao LangSmith
-4. **Avaliar a qualidade** através de métricas customizadas (F1-Score, Clarity, Precision)
+4. **Avaliar a qualidade** através das métricas do desafio (Tone, Acceptance Criteria, User Story Format, Completeness)
 5. **Atingir pontuação mínima** de 0.9 (90%) em todas as métricas de avaliação
 
 ---
@@ -15,40 +15,32 @@ Você deve entregar um software capaz de:
 ## Exemplo no CLI
 
 ```bash
-# Executar o pull dos prompts ruins do LangSmith
-python src/pull_prompts.py
+# Executar o pull do prompt base
+python3 src/pull_prompts.py
 
-# Executar avaliação inicial (prompts ruins)
-python src/evaluate.py
+# Fazer push da versão otimizada
+python3 src/push_prompts.py
 
-Executando avaliação dos prompts...
-================================
-Prompt: support_bot_v1a
-- Helpfulness: 0.45
-- Correctness: 0.52
-- F1-Score: 0.48
-- Clarity: 0.50
-- Precision: 0.46
-================================
-Status: FALHOU - Métricas abaixo do mínimo de 0.9
+# Executar avaliação final
+python3 src/evaluate.py
 
-# Após refatorar os prompts e fazer push
-python src/push_prompts.py
+==================================================
+AVALIAÇÃO DE PROMPTS OTIMIZADOS
+==================================================
 
-# Executar avaliação final (prompts otimizados)
-python src/evaluate.py
+Prompt: guilhermefaleiros/bug_to_user_story_v2
 
-Executando avaliação dos prompts...
-================================
-Prompt: support_bot_v2_optimized
-- Helpfulness: 0.94
-- Correctness: 0.96
-- F1-Score: 0.93
-- Clarity: 0.95
-- Precision: 0.92
-================================
-Status: APROVADO ✓ - Todas as métricas atingiram o mínimo de 0.9
+Métricas do desafio:
+  - Tone Score: 0.90 ✓
+  - Acceptance Criteria Score: 0.93 ✓
+  - User Story Format Score: 0.96 ✓
+  - Completeness Score: 0.94 ✓
+
+📊 MÉDIA GERAL: 0.9332
+
+✅ STATUS: APROVADO
 ```
+
 ---
 
 ## Tecnologias obrigatórias
@@ -61,10 +53,233 @@ Status: APROVADO ✓ - Todas as métricas atingiram o mínimo de 0.9
 
 ---
 
+## Técnicas Aplicadas (Fase 2)
+
+O prompt final em `prompts/bug_to_user_story_v2.yml` foi refinado com um conjunto de técnicas combinadas para maximizar as quatro métricas do desafio.
+
+1. **Role Prompting**
+   - O modelo recebe o papel de **Product Manager sênior**.
+   - Isso ajudou a elevar o tom profissional, a coerência do vocabulário e a qualidade geral da user story.
+
+2. **Few-shot Learning**
+   - O prompt contém exemplos completos de entrada e saída.
+   - Os exemplos cobrem validação, segurança, compatibilidade entre navegadores e inconsistência de dashboard.
+   - Isso aumentou a consistência do formato e dos critérios de aceitação.
+
+3. **Rubric-based Prompting**
+   - O `system_prompt` orienta explicitamente o modelo para os eixos de avaliação do desafio: tom, formato, critérios e completude.
+   - Isso reduziu respostas vagas e ajudou a aproximar o output do padrão esperado pelos avaliadores.
+
+4. **Negative Examples**
+   - O prompt lista padrões proibidos, como benefícios vazios, user stories frias e critérios sem resultado observável.
+   - Isso foi importante para evitar regressões em `Tone` e `User Story Format`.
+
+5. **Emotional Priming**
+   - A instrução central reforça que o bug deve ser traduzido como uma necessidade real de alguém que foi impedido de completar uma tarefa.
+   - Isso elevou a qualidade do benefício descrito no `Para que`, que passou a ficar mais humano e concreto.
+
+6. **Structured Output / Skeleton of Thought**
+   - A saída foi rigidamente estruturada em:
+     - `## User Story`
+     - `## Critérios de Aceitação`
+     - `## Contexto Técnico`
+     - `## Impacto e Prioridade`
+     - `## Observações`
+   - Essa estrutura ajudou a aumentar `Completeness` sem prejudicar `Format`.
+
+### Como as técnicas foram aplicadas na prática
+
+- Persona explícita e especializada no `system_prompt`.
+- Template fixo para `Como / Eu quero / Para que`.
+- Requisitos obrigatórios no `user_prompt`.
+- Regras para preservar detalhes como IDs, valores, severidade, browsers, HTTP status e mensagens de erro.
+- Critérios em `Dado / Quando / Então` sempre numerados e testáveis.
+- Seções adicionais condicionais para contexto técnico e impacto.
+- Exemplos positivos concretos e padrões proibidos.
+
+## Processo de Refinamento
+
+O refinamento do prompt ocorreu de forma iterativa, com foco nas métricas que estavam mais baixas em cada rodada.
+
+1. **Versão inicial otimizada**
+   - Introduziu persona, few-shot e estrutura básica.
+   - Melhorou bastante a organização, mas ainda deixava oscilações em `Tone` e `Format`.
+
+2. **Refino de tom e benefício**
+   - O prompt passou a enfatizar linguagem positiva e benefício real para a pessoa afetada.
+   - Isso reduziu user stories frias e genéricas.
+
+3. **Refino de formato**
+   - A saída foi travada em um template mais rígido com `## User Story` e linhas `Como / Eu quero / Para que`.
+   - Isso elevou `User Story Format Score`.
+
+4. **Refino de completude**
+   - O prompt passou a exigir a preservação explícita de IDs, valores, severidade, endpoints, navegadores, mensagens e impacto.
+   - Isso melhorou `Completeness Score`.
+
+5. **Ajustes finais orientados por avaliação**
+   - Os few-shots foram expandidos.
+   - Foram adicionados padrões proibidos e instruções mais fortes de empatia.
+   - O README, os testes e o prompt foram alinhados para garantir qualidade e conformidade ao mesmo tempo.
+
+---
+
+## Resultados Finais
+
+### Resultado aprovado
+
+- **Prompt publicado:** `guilhermefaleiros/bug_to_user_story_v2`
+
+### Métricas finais obtidas
+
+| Métrica                   | Nota       |
+| ------------------------- | ---------- |
+| Tone Score                | **0.90**   |
+| Acceptance Criteria Score | **0.93**   |
+| User Story Format Score   | **0.96**   |
+| Completeness Score        | **0.94**   |
+| Média Geral               | **0.9332** |
+
+### Status final
+
+- Todas as 4 métricas ficaram `>= 0.9`
+- A média geral ficou `>= 0.9`
+- O prompt foi **aprovado**
+
+### Evidência de avaliação
+
+- Projeto no LangSmith: `prompt-optimization-challenge-resolved`
+- Prompt avaliado: `guilhermefaleiros/bug_to_user_story_v2`
+- Resultado final do CLI:
+  - `Tone Score: 0.90`
+  - `Acceptance Criteria Score: 0.93`
+  - `User Story Format Score: 0.96`
+  - `Completeness Score: 0.94`
+  - `Média Geral: 0.9332`
+
+### Screenshots
+
+#### Dataset criado no LangSmith
+
+![Dataset de avaliação no LangSmith](images/dataset.png)
+
+#### Execução final aprovada
+
+![Execução final aprovada da avaliação](images/execution.png)
+
+#### Traces e detalhes da execução
+
+![Traces da avaliação no LangSmith](images/traces.png)
+
+### Tabela comparativa
+
+| Aspecto                        | Prompt v1         | Prompt v2                                                                                                 |
+| ------------------------------ | ----------------- | --------------------------------------------------------------------------------------------------------- |
+| Persona                        | Genérica          | Product Manager sênior com foco na pessoa impactada                                                       |
+| Formato                        | Pouco prescritivo | Markdown com template fixo `Como / Eu quero / Para que`                                                   |
+| Few-shot                       | Não               | Sim, 4 exemplos completos                                                                                 |
+| Edge cases                     | Não               | Sim                                                                                                       |
+| Critérios de aceitação         | Implícitos        | Obrigatórios, numerados e testáveis                                                                       |
+| Contexto técnico               | Não orientado     | Obrigatório quando houver dados relevantes                                                                |
+| Impacto e prioridade           | Não               | Incluído quando aplicável                                                                                 |
+| Técnicas de prompt engineering | Não documentadas  | Role Prompting, Few-shot, Rubric-based Prompting, Negative Examples, Emotional Priming, Structured Output |
+
+---
+
+## Como Executar
+
+### Pré-requisitos
+
+- Python 3.9+
+- Credenciais válidas do LangSmith
+- Uma API Key de um provider suportado:
+  - OpenAI
+  - Google Gemini
+
+### Instalação
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+### Configuração do `.env`
+
+Preencha ao menos:
+
+```bash
+LANGSMITH_API_KEY=...
+LANGSMITH_PROJECT=...
+USERNAME_LANGSMITH_HUB=...
+
+LLM_PROVIDER=openai
+OPENAI_API_KEY=...
+LLM_MODEL=gpt-5-mini
+EVAL_MODEL=gpt-5
+```
+
+Ou, se preferir Gemini:
+
+```bash
+LLM_PROVIDER=google
+GOOGLE_API_KEY=...
+LLM_MODEL=gemini-2.5-flash
+EVAL_MODEL=gemini-2.5-flash
+```
+
+### Fase 1: Pull do prompt base
+
+```bash
+python3 src/pull_prompts.py
+```
+
+Arquivos gerados:
+
+- `prompts/bug_to_user_story_v1.yml`
+- `prompts/raw_prompts.yml`
+
+### Fase 2: Prompt otimizado
+
+O prompt otimizado já está pronto em:
+
+```bash
+prompts/bug_to_user_story_v2.yml
+```
+
+### Fase 3: Push para o LangSmith Hub
+
+```bash
+python3 src/push_prompts.py
+```
+
+O script tenta publicar:
+
+- `{USERNAME_LANGSMITH_HUB}/bug_to_user_story_v2`
+
+### Fase 4: Avaliação
+
+```bash
+python3 src/evaluate.py
+```
+
+Critério de aprovação implementado:
+
+- Todas as 4 métricas devem ser `>= 0.9`
+- A média geral também deve ser `>= 0.9`
+
+### Fase 5: Testes locais
+
+```bash
+pytest tests/test_prompts.py
+```
+
+---
+
 ## Pacotes recomendados
 
 ```python
-from langchain import hub  # Pull e Push de prompts
 from langsmith import Client  # Interação com LangSmith API
 from langsmith.evaluation import evaluate  # Avaliação de prompts
 from langchain_openai import ChatOpenAI  # LLM OpenAI
@@ -76,8 +291,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI  # LLM Gemini
 ## OpenAI
 
 - Crie uma **API Key** da OpenAI: https://platform.openai.com/api-keys
-- **Modelo de LLM para responder**: `gpt-4o-mini`
-- **Modelo de LLM para avaliação**: `gpt-4o`
+- **Modelo de LLM para responder utilizado na versão aprovada**: `gpt-5-mini`
+- **Modelo de LLM para avaliação utilizado na versão aprovada**: `gpt-5`
 - **Custo estimado:** ~$1-5 para completar o desafio
 
 ## Gemini (modelo free)
@@ -276,7 +491,6 @@ python src/evaluate.py
 ## Entregável
 
 1. **Repositório público no GitHub** (fork do repositório base) contendo:
-
    - Todo o código-fonte implementado
    - Arquivo `prompts/bug_to_user_story_v2.yml` 100% preenchido e funcional
    - Arquivo `README.md` atualizado com:
@@ -284,19 +498,16 @@ python src/evaluate.py
 2. **README.md deve conter:**
 
    A) **Seção "Técnicas Aplicadas (Fase 2)"**:
-
    - Quais técnicas avançadas você escolheu para refatorar os prompts
    - Justificativa de por que escolheu cada técnica
    - Exemplos práticos de como aplicou cada técnica
 
    B) **Seção "Resultados Finais"**:
-
    - Link público do seu dashboard do LangSmith mostrando as avaliações
    - Screenshots das avaliações com as notas mínimas de 0.9 atingidas
    - Tabela comparativa: prompts ruins (v1) vs prompts otimizados (v2)
 
    C) **Seção "Como Executar"**:
-
    - Instruções claras e detalhadas de como executar o projeto
    - Pré-requisitos e dependências
    - Comandos para cada fase do projeto
@@ -304,7 +515,6 @@ python src/evaluate.py
 3. **Evidências no LangSmith**:
    - Link público (ou screenshots) do dashboard do LangSmith
    - Devem estar visíveis:
-
      - Dataset de avaliação com ≥ 20 exemplos
      - Execuções dos prompts v1 (ruins) com notas baixas
      - Execuções dos prompts v2 (otimizados) com notas ≥ 0.9

@@ -8,6 +8,7 @@ import json
 from typing import Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
@@ -145,6 +146,49 @@ def validate_prompt_structure(prompt_data: Dict[str, Any]) -> tuple[bool, list]:
         errors.append(f"Mínimo de 2 técnicas requeridas, encontradas: {len(techniques)}")
 
     return (len(errors) == 0, errors)
+
+
+def build_chat_prompt_template(prompt_data: Dict[str, Any]) -> ChatPromptTemplate:
+    """
+    Constrói um ChatPromptTemplate a partir do YAML padronizado do projeto.
+    """
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", prompt_data["system_prompt"].strip()),
+            ("human", prompt_data.get("user_prompt", "{bug_report}").strip()),
+        ]
+    )
+
+
+def prompt_template_to_dict(prompt_name: str, prompt_template: Any) -> Dict[str, Any]:
+    """
+    Extrai campos de um ChatPromptTemplate para o formato YAML do projeto.
+    """
+    system_prompt = ""
+    user_prompt = "{bug_report}"
+
+    messages = getattr(prompt_template, "messages", [])
+    for message in messages:
+        template = getattr(getattr(message, "prompt", None), "template", "")
+        if not template:
+            continue
+
+        message_type = getattr(message, "__class__", type(message)).__name__.lower()
+        if "system" in message_type and not system_prompt:
+            system_prompt = template
+        elif any(token in message_type for token in ("human", "user")) and user_prompt == "{bug_report}":
+            user_prompt = template
+
+    return {
+        prompt_name: {
+            "description": f"Prompt importado do LangSmith Hub: {prompt_name}",
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "version": "v1",
+            "created_at": "2025-01-15",
+            "tags": ["langsmith", "imported", "bug-analysis"],
+        }
+    }
 
 
 def extract_json_from_response(response_text: str) -> Optional[Dict[str, Any]]:
